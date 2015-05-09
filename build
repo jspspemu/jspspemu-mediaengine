@@ -1,0 +1,10 @@
+pushd ffmpeg
+emconfigure ./configure --cc="emcc" --prefix=$(pwd)/../dist --disable-everything \
+	--enable-cross-compile \
+	--target-os=none --arch=x86_32 --cpu=generic --disable-ffplay \
+	--disable-ffprobe --disable-ffserver --disable-asm --disable-doc \
+	--disable-devices --disable-pthreads --disable-w32threads --disable-network \
+    --disable-hwaccels --disable-parsers --disable-bsfs --disable-debug --disable-protocols \
+    --disable-indevs --disable-outdevs --enable-protocol=file \
+    --enable-libvpx --enable-gpl
+popd

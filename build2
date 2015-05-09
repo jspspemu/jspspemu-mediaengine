@@ -1,0 +1,3 @@
+pushd ffmpeg
+emmake make
+popd
