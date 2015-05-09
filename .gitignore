@@ -1,3 +1,5 @@
 ffmpeg
 jspspemu-me.js
 jspspemu-me.js.mem
+*.bc
+*.js
