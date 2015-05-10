@@ -1,65 +1,77 @@
 pushd ffmpeg
-export OPTIONS="
-   --disable-everything
-   --disable-avdevice
-   --disable-programs
-   --disable-avfilter
-   --disable-postproc
-   --disable-doc
-   --disable-pthreads
-   --disable-network
-   --disable-encoders
-   --disable-muxers
-   --disable-hwaccels
-   --disable-parsers
-   --disable-protocols
-   --enable-dxva2
-	--enable-decoder=aac
-	--enable-decoder=aac_latm
-	--enable-decoder=atrac3
-	--enable-decoder=atrac3p
-	--enable-decoder=mp3
-	--enable-decoder=pcm_s16le
-	--enable-decoder=pcm_s8
-	--enable-decoder=h264
-	--enable-decoder=mpeg4
-	--enable-decoder=mpeg2video
-	--enable-decoder=mjpeg
-	--enable-decoder=mjpegb
-	--enable-encoder=pcm_s16le
-	--enable-encoder=huffyuv
-	--enable-encoder=ffv1
-	--enable-encoder=mjpeg
-	--enable-hwaccel=h264_dxva2
-	--enable-muxer=avi
-	--enable-demuxer=h264
-	--enable-demuxer=m4v
-	--enable-demuxer=mp3
-	--enable-demuxer=mpegvideo
-	--enable-demuxer=mpegps
-	--enable-demuxer=mjpeg
-	--enable-demuxer=avi
-	--enable-demuxer=aac
-	--enable-demuxer=pmp
-	--enable-demuxer=oma
-	--enable-demuxer=pcm_s16le
-	--enable-demuxer=pcm_s8
-	--enable-demuxer=wav
-	--enable-parser=h264
-	--enable-parser=mpeg4video
-	--enable-parser=mpegaudio
-	--enable-parser=mpegvideo
-	--enable-parser=mjpeg
-	--enable-parser=aac
-	--enable-parser=aac_latm
-"
-emconfigure ./configure --cc="emcc" --prefix=$(pwd)/../dist --disable-everything \
+#   --disable-programs
+#   --disable-everything
+#	--disable-ffserver \
+#	--disable-ffprobe \
+#	--enable-small \
+#	--disable-debug \
+emconfigure ./configure --cc="emcc" \
+	--prefix=$(pwd)/../dist \
 	--enable-cross-compile \
-	--target-os=none --arch=x86_32 --cpu=generic --disable-ffplay \
-	--disable-ffprobe --disable-ffserver --disable-asm --disable-doc \
-	--disable-devices --disable-pthreads --disable-w32threads --disable-network \
-    --disable-hwaccels --disable-parsers --disable-bsfs --disable-debug --disable-protocols \
-    --disable-indevs --disable-outdevs --enable-protocol=file \
-    $OPTIONS \
-    --enable-libvpx --enable-gpl
+	--target-os=none \
+	--arch=x86_32 \
+	--cpu=generic \
+	--disable-ffplay \
+	--disable-ffserver \
+	--disable-asm \
+	--disable-doc \
+	--disable-devices \
+	--disable-pthreads \
+	--disable-w32threads \
+	--disable-network \
+    --disable-hwaccels \
+    --disable-parsers \
+    --disable-bsfs \
+    --disable-protocols \
+    --disable-indevs \
+    --disable-outdevs \
+	--disable-avdevice \
+	--disable-avfilter \
+	--disable-postproc \
+	--disable-network \
+	--disable-encoders \
+	--disable-decoders \
+	--disable-muxers \
+	--disable-demuxers \
+	--disable-filters \
+    --enable-protocol=file \
+	--enable-dxva2 \
+	--enable-decoder=aac \
+	--enable-decoder=aac_latm \
+	--enable-decoder=atrac3 \
+	--enable-decoder=atrac3p \
+	--enable-decoder=mp3 \
+	--enable-decoder=pcm_s16le \
+	--enable-decoder=pcm_s8 \
+	--enable-decoder=h264 \
+	--enable-decoder=mpeg4 \
+	--enable-decoder=mpeg2video \
+	--enable-decoder=mjpeg \
+	--enable-decoder=mjpegb \
+	--enable-encoder=pcm_s16le \
+	--enable-encoder=huffyuv \
+	--enable-encoder=ffv1 \
+	--enable-encoder=mjpeg \
+	--enable-hwaccel=h264_dxva2 \
+	--enable-muxer=avi \
+	--enable-demuxer=h264 \
+	--enable-demuxer=m4v \
+	--enable-demuxer=mp3 \
+	--enable-demuxer=mpegvideo \
+	--enable-demuxer=mpegps \
+	--enable-demuxer=mjpeg \
+	--enable-demuxer=avi \
+	--enable-demuxer=aac \
+	--enable-demuxer=pmp \
+	--enable-demuxer=oma \
+	--enable-demuxer=pcm_s16le \
+	--enable-demuxer=pcm_s8 \
+	--enable-demuxer=wav \
+	--enable-parser=h264 \
+	--enable-parser=mpeg4video \
+	--enable-parser=mpegaudio \
+	--enable-parser=mpegvideo \
+	--enable-parser=mjpeg \
+	--enable-parser=aac \
+	--enable-parser=aac_latm
 popd
