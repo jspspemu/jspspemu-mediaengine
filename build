@@ -11,6 +11,7 @@ emconfigure ./configure --cc="emcc" \
 	--target-os=none \
 	--arch=x86_32 \
 	--cpu=generic \
+	--disable-debug \
 	--disable-ffplay \
 	--disable-ffserver \
 	--disable-asm \

@@ -1,3 +1,5 @@
+// https://libav.org/doxygen/release/0.8/libavcodec_2api-example_8c-example.html
+// https://github.com/FFmpeg/FFmpeg/blob/master/doc/examples/decoding_encoding.c
     #include <stdio.h>
 #include "ffmpeg/ffmpeg.h"
 
@@ -55,6 +57,75 @@ unsigned char hexData[552] = {0xFF, 0xF3, 0x14, 0xC4, 0x00, 0x02, 0x70, 0x3A, 0x
                                                                                                                              
                                                                                                                              
                                                                                                                                             
+
+typedef struct {
+	AVPacket avpkt;
+    AVCodec *codec;
+    AVCodecContext *c;
+    AVFrame *decoded_frame;
+    int len;
+    int data_size;
+    int got_frame;
+} ME_DecodeState;
+
+ME_DecodeState *me_audio_decode_alloc(int format) {
+	ME_DecodeState *state = malloc(sizeof(ME_DecodeState));
+	av_init_packet(&state->avpkt);
+	state->codec = avcodec_find_decoder(CODEC_ID_MP3);
+    state->c = avcodec_alloc_context3(state->codec);
+	avcodec_open2(state->c, state->codec, NULL);
+    state->decoded_frame = av_frame_alloc();
+	return state;
+}
+
+void me_audio_decode_set_data(ME_DecodeState* state, void* dataPtr, int dataSize) {
+    state->avpkt.data = dataPtr;
+    state->avpkt.size = dataSize;
+    state->len = avcodec_decode_audio4(state->c, state->decoded_frame, &state->got_frame, &state->avpkt);
+    state->data_size = av_get_bytes_per_sample(state->c->sample_fmt);
+}
+
+int me_audio_decode_get_numsamples(ME_DecodeState* state) {
+	return state->decoded_frame->nb_samples;
+}
+
+int me_audio_decode_get_numchannels(ME_DecodeState* state) {
+	return state->c->channels;
+}
+
+int me_audio_decode_get_sample(ME_DecodeState* state, int channel, int sample) {
+	if (state->data_size == 2) {
+		return *(short*)(state->decoded_frame->data[channel] + (state->data_size) * sample);
+	}
+	return -1;
+}
+
+void me_audio_decode_free(ME_DecodeState* state) {
+	free(state);
+}
+
+
+
+EXPORT int main2() {
+	ME_DecodeState *state = me_audio_decode_alloc(CODEC_ID_MP3);
+	int samples, channels, i, ch;
+	me_audio_decode_set_data(state, hexData, sizeof(hexData));
+	samples = me_audio_decode_get_numsamples(state);
+	channels = me_audio_decode_get_numchannels(state);
+
+    //printf("len:%d, got_frame:%d, data_size=%d, samples:%d\n", len, got_frame, data_size, decoded_frame->nb_samples);
+    for (i=0; i < samples; i++) {
+    	for (ch=0; ch < channels; ch++) {
+    		printf("%d\n", me_audio_decode_get_sample(state, ch, i));
+        	//fwrite(decoded_frame->data[ch] + data_size*i, 1, data_size, outfile);
+    	}
+    }
+
+	me_audio_decode_free(state);
+
+	return 0;
+}
+
 void test2() {
 AVCodec * codec = av_codec_next(NULL);
 while(codec != NULL)
@@ -62,37 +133,4 @@ while(codec != NULL)
     fprintf(stderr, "%s\n", codec->long_name);
         codec = av_codec_next(codec);
         }
-}
-
-EXPORT int main2() {
-    AVPacket avpkt;
-    AVFrame *decoded_frame = NULL;
-    AVCodec *codec;
-    AVCodecContext *c= NULL;
-    int got_frame = 0;
-    int len = 0;
-
-	printf("verrsion: %d\n", avformat_version());
-
-    av_init_packet(&avpkt);
-    
-    av_register_all();
-    test2();
-
-	printf("codec: %d\n", CODEC_ID_MP3);
-    codec = avcodec_find_decoder(CODEC_ID_MP3);
-    printf("codec: %p\n", codec);
-    c = avcodec_alloc_context3(codec);
-
-	avcodec_open2(c, codec, NULL);
-	
-    avpkt.data = hexData;
-    avpkt.size = sizeof(hexData);
-    
-    decoded_frame = av_frame_alloc();
-    len = avcodec_decode_audio4(c, decoded_frame, &got_frame, &avpkt);
-    
-    printf("len:%d, got_frame:%d\n", len, got_frame);
-
-	return 0;
 }
