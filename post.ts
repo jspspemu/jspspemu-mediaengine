@@ -35,7 +35,7 @@ interface ME_BufferData { __ME_BufferData:number; }
 // STREAM
 declare function _me_init():void;
 declare function _me_open(name:pointer):ME_DecodeState;
-declare function _me_close(state:ME_DecodeState);
+declare function _me_close(state:ME_DecodeState):void;
 
 // PACKET
 declare function _me_packet_read(state:ME_DecodeState):ME_Packet;
@@ -54,7 +54,7 @@ declare function _me_packet_decode_audio(state:ME_DecodeState, packet:ME_Packet,
 
 _me_init();
 
-class MeBuffer {
+export class MeBuffer {
 	constructor(public buffer:ME_BufferData) { }
 	static alloc(size:number) { return new MeBuffer(_me_buffer_alloc(size)); }
 	get size():number { return _me_buffer_get_size(this.buffer); }
@@ -67,7 +67,7 @@ class MeBuffer {
 	free() { _me_buffer_free(this.buffer); }
 }
 
-class MeString {
+export class MeString {
 	public ptr:pointer;
 
 	constructor(public name:string) {
@@ -79,7 +79,7 @@ class MeString {
 	}
 }
 
-class MePacket {
+export class MePacket {
 	constructor(public stream:MeStream, public packet:ME_Packet) {
 	}
 	get type():ME_MediaType { return _me_packet_get_type(this.packet); }
@@ -113,7 +113,7 @@ class MePacket {
 	free() { _me_packet_free(this.packet); }
 }
 
-class MeStream {
+export class MeStream {
 	constructor(public state:ME_DecodeState, public onclose?:(stream:MeStream) => void) {
 	}
 	close() {
@@ -143,6 +143,7 @@ class MeStream {
 	}
 }
 
+/*
 var compressedData = new Uint8Array([
     0xFF, 0xF3, 0x14, 0xC4, 0x00, 0x02, 0x70, 0x3A, 0xEC, 0x01, 0x43, 0x00, 0x01, 0x77, 0x77, 0x77,
     0x38, 0x80, 0x60, 0x60, 0x60, 0x6E, 0x3D, 0x87, 0xFF, 0xF3, 0x14, 0xC4, 0x01, 0x02, 0x80, 0x3B,
@@ -190,3 +191,4 @@ while (true) {
 	console.log(packet.decodeAudioAndFree(2, 44100));
 }
 stream.close();
+*/
