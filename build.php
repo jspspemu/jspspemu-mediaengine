@@ -1,7 +1,8 @@
 <?php
 	
 //$emscripten = 'c:\\dev\\emscripten';
-$emscripten = '/cygdrive/c/dev/emscripten';
+//$emscripten = '/cygdrive/c/dev/emscripten';
+$emscripten = realpath(__DIR__ . '/../emscripten');
 $paths = [
 	"/usr/bin",
 	"{$emscripten}/clang/e1.30.0_64bit",
@@ -21,15 +22,17 @@ $matches = []; preg_match_all('@declare\\s+function\\s+(_\\w+)@', file_get_conte
 print_r($paths);
 print_r($functions);
 
-$TOTAL_MEMORY = 8 * 1024 * 1024;
+$TOTAL_MEMORY = 16 * 1024 * 1024;
 passthru('emcc.bat main.c -I ffmpeg -o main.bc');
 passthru('tsc -t ES5 post.ts');
 $args = [];
-$args[] = '-s NO_EXIT_RUNTIME=1';
-$args[] = '-s OUTLINING_LIMIT=100000';
+//$args[] = '-s NO_EXIT_RUNTIME=1';
+//$args[] = '-s OUTLINING_LIMIT=100000';
 $args[] = "-s TOTAL_MEMORY=$TOTAL_MEMORY";
 $args[] = '--memory-init-file 0';
 $args[] = '-O0';
+//$args[] = '-O2 -s AGGRESSIVE_VARIABLE_ELIMINATION=1';
+//$args[] = '-O1';
 $args[] = '-s EXPORTED_FUNCTIONS="' . str_replace('"', "'", json_encode($functions)) . '"';
 $args[] = 'ffprobe.bc';
 $args[] = 'main.bc';

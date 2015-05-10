@@ -8,7 +8,7 @@ const enum AudioFormat {
 	ATRAC3P = 0x15028,
 }
 
-enum ME_MediaType {
+enum ChannelType {
 	Unknown = -1,
 	Video = 0,
 	Audio = 1,
@@ -18,131 +18,100 @@ enum ME_MediaType {
 	Nb = 5,
 }
 
-declare var FS:any;
 declare var HEAP8:Uint8Array;
 declare function _malloc(size:int):pointer;
 declare function _free(ptr:pointer):void;
-declare function writeStringToMemory(str:string, ptr:pointer):void;
 
 declare function _av_malloc(size:int):pointer;
 declare function _av_free(ptr:pointer):void;
 
 
-interface ME_DecodeState { __ME_DecodeState:number; }
-interface ME_Packet { __ME_Packet:number; }
-interface ME_BufferData { __ME_BufferData:number; }
-
-// STREAM
+interface MeState { __me_prt:string;}
 declare function _me_init():void;
-declare function _me_open(name:pointer):ME_DecodeState;
-declare function _me_close(state:ME_DecodeState);
+declare function _me_show_codec_ids():void;
+declare function _me_audio_decode_alloc(format:AudioFormat):MeState;
+declare function _me_audio_decode_free(state:MeState):void;
+declare function _me_audio_decode_get_numsamples(state:MeState):int;
+declare function _me_audio_decode_get_numchannels(state:MeState):int;
+declare function _me_audio_decode_set_data(state:MeState, ptr:pointer, size:int):int;
+declare function _me_audio_decode_get_data_size(state:MeState):int;
+declare function _me_audio_decode_get_data(state:MeState, ptr:pointer):void;
 
-// PACKET
-declare function _me_packet_read(state:ME_DecodeState):ME_Packet;
-declare function _me_packet_free(packet:ME_Packet):void;
-declare function _me_packet_get_type(packet:ME_Packet):ME_MediaType;
+declare function _me_audio_decode_get_sample(state:MeState, channel:int, sample:int):int;
 
-// BUFFER
-declare function _me_buffer_get_size(buffer:ME_BufferData):number;
-declare function _me_buffer_get_data(buffer:ME_BufferData):pointer;
-declare function _me_buffer_alloc(size:number):ME_BufferData;
-declare function _me_buffer_alloc_copy_data(data:pointer, size:number):ME_BufferData;
-declare function _me_buffer_free(buffer:ME_BufferData):void;
-
-// AUDIO
-declare function _me_packet_decode_audio(state:ME_DecodeState, packet:ME_Packet, channels:number, rate:number):ME_BufferData;
-
-_me_init();
-
-class MeBuffer {
-	constructor(public buffer:ME_BufferData) { }
-	static alloc(size:number) { return new MeBuffer(_me_buffer_alloc(size)); }
-	get size():number { return _me_buffer_get_size(this.buffer); }
-	get pointer():pointer { return _me_buffer_get_data(this.buffer); }
-	get data():Uint8Array { return HEAP8.subarray(<any>this.pointer, <any>this.pointer + this.size); }
-	get datas16():Int16Array {
-		var data = this.data;
-		return new Int16Array(data.buffer, data.byteOffset, data.byteLength / 2);
-	}
-	free() { _me_buffer_free(this.buffer); }
+function writeUint8ArrayToMemory(ptr:pointer, data:Uint8Array):void {
+	var ptr2 = <number><any>ptr;
+	HEAP8.subarray(ptr2, ptr2 + data.length).set(data);
 }
 
-class MeString {
-	public ptr:pointer;
-
-	constructor(public name:string) {
-		this.ptr = _malloc(name.length + 1);
-		writeStringToMemory(name, this.ptr);
-	}
-	free() {
-		_free(this.ptr);
-	}
+function readUint8ArrayFromMemory(ptr:pointer, size:number):Uint8Array {
+	var ptr2 = <number><any>ptr;
+	var out = new Uint8Array(size);
+	out.set(HEAP8.subarray(ptr2, ptr2 + size));
+	return out;
 }
 
-class MePacket {
-	constructor(public stream:MeStream, public packet:ME_Packet) {
+class AudioDecoder {
+	state: MeState;
+	
+	private static init = _me_init();
+	
+	constructor(format:AudioFormat) {
+		this.state = _me_audio_decode_alloc(format);
 	}
-	get type():ME_MediaType { return _me_packet_get_type(this.packet); }
-	/*
-	decodeAudioFrames(channels:number):Int16Array[] {
-		var frames = [];
-		for (var n = 0; n < 10000; n++) {
-			var frame = this.decodeAudio(channels);
-			if (frame == null) break;
-			frames.push(frame);
-		}
-		return frames;
-	}
-	*/
-	decodeAudio(channels:number, rate:number):Int16Array {
-		var buffer_ptr = _me_packet_decode_audio(this.stream.state, this.packet, channels, rate);
-		if (<any>buffer_ptr == 0) return null;
-		var buffer = new MeBuffer(buffer_ptr);
-		var out = new Int16Array(buffer.size / 2);
-		out.set(buffer.datas16);
-		buffer.free();
-		return out;
-	}
-	decodeAudioAndFree(channels:number, rate:number):Int16Array {
-		try {
-			return this.decodeAudio(channels, rate);
-		} finally {
-			this.free();
-		}
-	}
-	free() { _me_packet_free(this.packet); }
-}
+	
+	get numSamples() { return _me_audio_decode_get_numsamples(this.state); }
+	get numChannels() { return _me_audio_decode_get_numchannels(this.state); }
 
-class MeStream {
-	constructor(public state:ME_DecodeState, public onclose?:(stream:MeStream) => void) {
+	setData(data:Uint8Array) {
+		var temp = _malloc(data.length);
+		writeUint8ArrayToMemory(temp, data);
+		_me_audio_decode_set_data(this.state, temp, data.length);
+		//_free(temp);
 	}
-	close() {
-		if (this.onclose) this.onclose(this);
-		_me_close(this.state);
+	
+	getData():Int16Array {
+		var size = _me_audio_decode_get_data_size(this.state);
+		var data = _malloc(size);
+		_me_audio_decode_get_data(this.state, data);
+		var out = readUint8ArrayFromMemory(data, size);
+		_free(data);
+		return new Int16Array(out.buffer);
 	}
-	readPacket() {
-		var v = _me_packet_read(this.state);
-		if ((<any>v) == 0) return null;
-		return new MePacket(this, v);
+
+	getSample(channel:int, sample:int) {
+		return _me_audio_decode_get_sample(this.state, channel, sample);
 	}
-	static open(name:string, onclose?:(stream:MeStream) => void) {
-		var nameStr = new MeString(name);
-		try {
-			return new MeStream(_me_open(nameStr.ptr), onclose);
-		} finally {
-			nameStr.free();
-		}
-	}
-	private static index:number = 0;
-	static openData(data:Uint8Array, onclose?:(stream:MeStream) => void) {
-		var name = `temp${this.index++}.bin`;
-		FS.writeFile(name, data, {encoding:'binary'});
-		return this.open(name, () => {
-			FS.unlink(name);
-		});
+ 
+	deinit() {
+		_me_audio_decode_free(this.state);
 	}
 }
 
+class Atrac3Decoder {
+	private decoder = new AudioDecoder(AudioFormat.ATRAC3P); 
+	constructor() {
+		
+	}
+	get channels():number {
+		return this.decoder.numChannels;
+	}
+	decodedSamples: number;
+	initWithHeader(data: Uint8Array): void {
+		
+	}
+	decode(data: Uint8Array): Int16Array {
+		this.decoder.setData(data);
+		return this.decoder.getData();
+	}
+	destroy():void {
+		this.decoder.deinit();
+	}
+}
+
+//_me_show_codec_ids();
+
+/*
 var compressedData = new Uint8Array([
     0xFF, 0xF3, 0x14, 0xC4, 0x00, 0x02, 0x70, 0x3A, 0xEC, 0x01, 0x43, 0x00, 0x01, 0x77, 0x77, 0x77,
     0x38, 0x80, 0x60, 0x60, 0x60, 0x6E, 0x3D, 0x87, 0xFF, 0xF3, 0x14, 0xC4, 0x01, 0x02, 0x80, 0x3B,
@@ -180,13 +149,22 @@ var compressedData = new Uint8Array([
     0xFF, 0xF3, 0x14, 0xC4, 0x47, 0x02, 0xB8, 0x2A, 0xB8, 0x01, 0xC6, 0x00, 0x01, 0x55, 0x55, 0x55,
     0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 
 ]);
+                                                                                                                                            
 
-var stream = MeStream.openData(compressedData);
-while (true) {
-	var packet = stream.readPacket();
-	if (packet == null) break;
-	//console.log(packet.decodeAudioAndFree(2, 44100));
-	//break;
-	console.log(packet.decodeAudioAndFree(2, 44100));
-}
-stream.close();
+var ad = new AudioDecoder(AudioFormat.MP3);
+ad.setData(compressedData);
+var samples = ad.numSamples;
+var channels = ad.numChannels;
+console.log(samples, channels);
+console.log(ad.getData());
+console.log(ad.getData());
+console.log(ad.getData());
+//
+//for (var n = 0; n < samples; n++) {
+//	for (var ch = 0; ch < channels; ch++) {
+//		console.log(ad.getSample(ch, n));
+//	}
+//}
+ad.deinit();
+//
+*/

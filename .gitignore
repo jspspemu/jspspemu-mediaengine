@@ -2,6 +2,10 @@ ffmpeg
 jspspemu-me.js
 jspspemu-me.js.mem
 dist
+.idea
+*.iws
 *.7z
 *.bc
 *.js
+*.at3
+
