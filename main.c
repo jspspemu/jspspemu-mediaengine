@@ -129,16 +129,26 @@ ME_BufferData *me_packet_decode_audio(ME_DecodeState *state, AVPacket *packet, i
 	int samples = 0;
 	int irate = 0;
 	void* ichannels[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
-	int consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, packet);
+	int consumed = 0;
 	
-	//printf("ptr: %p, size: %d, pos: %d, consumed: %d\n", packet->data, packet->size, (int)packet->pos, (int)consumed);
+	if (packet->size <= 0) return NULL;
+	
+	consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, packet);
 	
 	//if (gotFrame == 0 || consumed <= 0 && (packet->pos + consumed) >= packet->size) {
 	if (gotFrame == 0 || consumed <= 0) {
+		packet->data = NULL;
+		packet->size = 0;
+		//consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, packet);
+
 		av_frame_free(&frame);
 		return NULL;
 	} else {
+		packet->size -= consumed;
+		packet->data += consumed;
+
 		irate = frame->sample_rate;
+		if (orate <= 0) orate = irate;
 		samples = (frame->nb_samples * orate) / irate;
 		buffer = me_buffer_alloc(channels * samples * sizeof(short));
 		ptr = buffer->data16;

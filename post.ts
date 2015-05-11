@@ -83,17 +83,16 @@ export class MePacket {
 	constructor(public stream:MeStream, public packet:ME_Packet) {
 	}
 	get type():ME_MediaType { return _me_packet_get_type(this.packet); }
-	/*
-	decodeAudioFrames(channels:number):Int16Array[] {
-		var frames = [];
+	decodeAudioFramesAndFree(channels:number, rate:number):Int16Array[] {
+		var frames:Int16Array[] = [];
 		for (var n = 0; n < 10000; n++) {
-			var frame = this.decodeAudio(channels);
+			var frame = this.decodeAudio(channels, rate);
 			if (frame == null) break;
 			frames.push(frame);
 		}
+		this.free();
 		return frames;
 	}
-	*/
 	decodeAudio(channels:number, rate:number):Int16Array {
 		var buffer_ptr = _me_packet_decode_audio(this.stream.state, this.packet, channels, rate);
 		if (<any>buffer_ptr == 0) return null;
