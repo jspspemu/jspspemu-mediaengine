@@ -1,5 +1,5 @@
 type int = number;
-interface pointer { __pointer:string; }
+export interface pointer { __pointer:string; }
 
 const enum AudioFormat {
 	MP2     = 0x15000,
@@ -8,7 +8,7 @@ const enum AudioFormat {
 	ATRAC3P = 0x15028,
 }
 
-enum ME_MediaType {
+export enum ME_MediaType {
 	Unknown = -1,
 	Video = 0,
 	Audio = 1,
@@ -28,9 +28,9 @@ declare function _av_malloc(size:int):pointer;
 declare function _av_free(ptr:pointer):void;
 
 
-interface ME_DecodeState { __ME_DecodeState:number; }
-interface ME_Packet { __ME_Packet:number; }
-interface ME_BufferData { __ME_BufferData:number; }
+export interface ME_DecodeState { __ME_DecodeState:number; }
+export interface ME_Packet { __ME_Packet:number; }
+export interface ME_BufferData { __ME_BufferData:number; }
 
 // STREAM
 declare function _me_init():void;

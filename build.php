@@ -29,6 +29,11 @@ print_r($functions);
 $TOTAL_MEMORY = 16 * 1024 * 1024;
 passthru("$emcc main.c -I ffmpeg -o main.bc");
 passthru('tsc');
+passthru('tsc -m commonjs -t ES5 -d post.ts');
+$postdts = file_get_contents('post.d.ts');
+$postdts = preg_replace('@\\bdeclare\\b@', '', $postdts);
+file_put_contents('../jspspemu/source/src/global/me.d.ts', "declare module MediaEngine {\n{$postdts}\n}");
+
 $args = [];
 //$args[] = '-s NO_EXIT_RUNTIME=1';
 //$args[] = '-s OUTLINING_LIMIT=100000';
@@ -59,6 +64,10 @@ echo "$command\n";
 passthru($command);
 unlink('_pre.js');
 unlink('_post.js');
+
+copy('jspspemu-me.js', '../jspspemu/jspspemu-me.js');
+
+
 
 
 /*

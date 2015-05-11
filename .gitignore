@@ -7,5 +7,6 @@ dist
 *.7z
 *.bc
 *.js
+*.d.ts
 *.at3
 
