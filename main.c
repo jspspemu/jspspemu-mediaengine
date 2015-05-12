@@ -12,15 +12,7 @@ typedef struct {
 	AVFormatContext *format;
 	AVStream *stream_audio;
 	AVStream *stream_video;
-	/*
-	AVPacket avpkt;
-    AVCodec *codec;
-    AVCodecContext *c;
-    AVFrame *decoded_frame;
-    int len;
-    int data_size;
-    int got_frame;
-    */
+	unsigned char* pBuffer;
 } ME_DecodeState;
 
 typedef struct {
@@ -35,14 +27,33 @@ typedef struct {
 } ME_BufferData;
 
 void me_init() {
+	//printf("AVSEEK_SIZE:%08x\n", AVSEEK_SIZE);
 	avcodec_register_all();
 	av_register_all();
+	printf("MediaEngine loaded!\n");
 }
 
-ME_DecodeState *me_open(char* filename) {
+ME_DecodeState *me_open(
+	char* filename,
+	void *filearg,
+	int(*readfunc)(void *opaque, uint8_t *buf, int buf_size),
+	int(*writefunc)(void *opaque, uint8_t *buf, int buf_size),
+	int64_t(*seekfunc)(void *opaque, int64_t offset, int whence)
+) {
 	ME_DecodeState *state = av_malloc(sizeof(ME_DecodeState));
+	memset(state, 0, sizeof(ME_DecodeState));
 	int i = 0;
 
+	// Create internal Buffer for FFmpeg:
+	const int iBufSize = 32 * 1024;
+	unsigned char* pBuffer = av_malloc(iBufSize);
+	
+	AVIOContext* pIOCtx = avio_alloc_context(pBuffer, iBufSize, 0, filearg, readfunc, writefunc, seekfunc);
+	//AVIOContext* pIOCtx = avio_alloc_context(pBuffer, iBufSize, 0, filearg, readfunc, NULL, NULL);
+										 
+	state->format = avformat_alloc_context();
+	state->format->pb = pIOCtx;
+ 
 	if ((avformat_open_input(&state->format, filename, NULL, NULL)) < 0) {
 		av_log(NULL, AV_LOG_ERROR, "Cannot open input file\n");
 		return NULL;
@@ -76,11 +87,14 @@ ME_DecodeState *me_open(char* filename) {
 
 void me_close(ME_DecodeState *state) {
 	avformat_close_input(&state->format);
+	//fclose(state->file);
+	av_free(state->pBuffer);
 	av_free(state);
 }
 
 AVPacket *me_packet_read(ME_DecodeState *state) {
 	AVPacket *packet = av_malloc(sizeof(AVPacket));
+	memset(packet, 0, sizeof(AVPacket));
 	if (av_read_frame(state->format, packet) < 0) {
 		av_free(packet);
 		return NULL;

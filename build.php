@@ -39,12 +39,18 @@ $args = [];
 //$args[] = '-s OUTLINING_LIMIT=100000';
 //$args[] = '-s AGGRESSIVE_VARIABLE_ELIMINATION=1';
 $args[] = "-s TOTAL_MEMORY=$TOTAL_MEMORY";
+$args[] = "-s RESERVED_FUNCTION_POINTERS=100";
+
 $args[] = '--memory-init-file 0';
+
 if (PHP_OS == 'CYGWIN') {
-	$args[] = '-O2 --closure 0';
+	//$args[] = '-O0 -Werror --closure 0 -s ASSERTIONS=2';
+	$args[] = '-O2';
 } else {
-	$args[] = '-O2 --closure 0'; // Or exported names are discarded
+	$args[] = '-O2';
 }
+$args[] = '--closure 0'; // Or exported names are discarded
+
 //$args[] = '-O1';
 $args[] = '-s EXPORTED_FUNCTIONS="' . str_replace('"', "'", json_encode($functions)) . '"';
 $args[] = 'ffprobe.bc';

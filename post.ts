@@ -32,9 +32,13 @@ export interface ME_DecodeState { __ME_DecodeState:number; }
 export interface ME_Packet { __ME_Packet:number; }
 export interface ME_BufferData { __ME_BufferData:number; }
 
+declare class Runtime {
+	static addFunction(callback: Function):number;
+}
+
 // STREAM
 declare function _me_init():void;
-declare function _me_open(name:pointer):ME_DecodeState;
+declare function _me_open(name:pointer, filearg:number, readfunc:number, writefunc:number, seekfunc:number):ME_DecodeState;
 declare function _me_close(state:ME_DecodeState):void;
 
 // PACKET
@@ -112,6 +116,103 @@ export class MePacket {
 	free() { _me_packet_free(this.packet); }
 }
 
+export enum SeekType {
+	Set = 0,
+	Cur = 1,
+	End = 2,
+	Tell = 0x10000,
+}
+
+export class CustomStream {
+	static items:{[key:number]:CustomStream} = {};
+	static lastId = 0;
+	static alloc(stream:CustomStream) {
+		var id = this.lastId++;
+		this.items[id] = stream;
+		return id;
+	}
+	static free(id:number) {
+		delete this.items[id];
+	}
+	constructor(public name:string = 'customstream') { }
+	
+	public read(buf:Uint8Array):number {
+		throw new Error("Must override CustomStream.read()");
+	}
+	public write(buf:Uint8Array):number {
+		throw new Error("Must override CustomStream.write()");
+	}
+	private _position: number = 0;
+	get length():number {
+		throw new Error("Must override CustomStream.seek()");
+	}
+	get available():number {
+		return this.length - this.position;
+	}
+	get position() {
+		return this._position;
+	}
+	set position(value:number) {
+		this._position = value;
+	}
+	
+	public _read(buf:Uint8Array):number {
+		var result = this.read(buf);
+		if (result >= 0) this.position += result;
+		return result;
+	}
+
+	public _write(buf:Uint8Array):number {
+		var result = this.write(buf);
+		if (result >= 0) this.position += result;
+		return result;
+	}
+
+	public _seek(offset: number, whence: SeekType) {
+		switch (whence) {
+			case SeekType.Set: this.position = 0 + offset; break;
+			case SeekType.Cur: this.position = this.position + offset; break;
+			case SeekType.End: this.position = this.length + offset; break;
+			case SeekType.Tell: return this.position;
+		}
+		return this.position;
+	}
+	public close():void {
+	}
+}
+
+var readfunc = Runtime.addFunction((opaque:number, buf:number, buf_size:number) => {
+	//console.log('readfunc', opaque, buf, buf_size);
+	return CustomStream.items[opaque]._read(HEAP8.subarray(buf, buf + buf_size));
+});
+var writefunc = Runtime.addFunction((opaque:number, buf:number, buf_size:number) => {
+	//console.log('writefunc', opaque, buf, buf_size);
+	return CustomStream.items[opaque]._write(HEAP8.subarray(buf, buf + buf_size));
+});
+var seekfunc = Runtime.addFunction((opaque:number, offset:number, whence:SeekType) => {
+	//console.log('seekfunc', opaque, offset, whence);
+	return CustomStream.items[opaque]._seek(offset, whence);
+});
+
+export class MemoryCustomStream extends CustomStream {
+	constructor(public data:Uint8Array) {
+		super();
+	}
+	get length() { return this.data.length; }
+	
+	public read(buf:Uint8Array):number {
+		//console.log('read', buf.length);
+		var readlen = Math.min(buf.length, this.available);
+		buf.subarray(0, readlen).set(this.data.subarray(this.position, this.position + readlen));
+		return readlen;
+	}
+	public write(buf:Uint8Array):number {
+		throw new Error("Must override CustomStream.write()");
+	}
+	public close():void {
+	}
+}
+
 export class MeStream {
 	constructor(public state:ME_DecodeState, public onclose?:(stream:MeStream) => void) {
 	}
@@ -124,21 +225,21 @@ export class MeStream {
 		if ((<any>v) == 0) return null;
 		return new MePacket(this, v);
 	}
-	static open(name:string, onclose?:(stream:MeStream) => void) {
-		var nameStr = new MeString(name);
+	static open(customStream:CustomStream):MeStream {
+		var nameStr = new MeString(customStream.name);
 		try {
-			return new MeStream(_me_open(nameStr.ptr), onclose);
+			var csid = CustomStream.alloc(customStream);
+			return new MeStream(
+				_me_open(nameStr.ptr, csid, readfunc, writefunc, seekfunc), () => {
+					customStream.close();
+					CustomStream.free(csid);
+				});
 		} finally {
 			nameStr.free();
 		}
 	}
-	private static index:number = 0;
-	static openData(data:Uint8Array, onclose?:(stream:MeStream) => void) {
-		var name = `temp${this.index++}.bin`;
-		FS.writeFile(name, data, {encoding:'binary'});
-		return this.open(name, () => {
-			FS.unlink(name);
-		});
+	static openData(data:Uint8Array) {
+		return this.open(new MemoryCustomStream(data));
 	}
 }
 
