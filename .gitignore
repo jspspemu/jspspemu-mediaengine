@@ -8,4 +8,15 @@ dist
 *.js
 *.d.ts
 *.at3
-
+*.a
+*.o
+*.so
+*.dylib
+ffserver
+ffserver_g
+ffplay
+ffplay_g
+ffprobe
+ffprobe_g
+ffmpeg
+ffmpeg_g
