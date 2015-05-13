@@ -40,11 +40,16 @@ declare class Runtime {
 declare function _me_init():void;
 declare function _me_open(name:pointer, filearg:number, readfunc:number, writefunc:number, seekfunc:number):ME_DecodeState;
 declare function _me_close(state:ME_DecodeState):void;
+declare function _me_seek(state:ME_DecodeState, timestamp:number):void;
 
 // PACKET
 declare function _me_packet_read(state:ME_DecodeState):ME_Packet;
 declare function _me_packet_free(packet:ME_Packet):void;
 declare function _me_packet_get_type(packet:ME_Packet):ME_MediaType;
+declare function _me_packet_get_pts(packet:ME_Packet):number;
+declare function _me_packet_get_dts(packet:ME_Packet):number;
+declare function _me_packet_get_pos(packet:ME_Packet):number;
+declare function _me_packet_get_duration(packet:ME_Packet):number;
 
 // BUFFER
 declare function _me_buffer_get_size(buffer:ME_BufferData):number;
@@ -87,6 +92,11 @@ export class MePacket {
 	constructor(public stream:MeStream, public packet:ME_Packet) {
 	}
 	get type():ME_MediaType { return _me_packet_get_type(this.packet); }
+	get pts():number { return _me_packet_get_pts(this.packet); }
+	get dts():number { return _me_packet_get_dts(this.packet); }
+	get pos():number { return _me_packet_get_pos(this.packet); }
+	get duration():number { return _me_packet_get_duration(this.packet); }
+
 	decodeAudioFramesAndFree(channels:number, rate:number):Int16Array[] {
 		var frames:Int16Array[] = [];
 		for (var n = 0; n < 10000; n++) {
@@ -189,9 +199,9 @@ var writefunc = Runtime.addFunction((opaque:number, buf:number, buf_size:number)
 	//console.log('writefunc', opaque, buf, buf_size);
 	return CustomStream.items[opaque]._write(HEAP8.subarray(buf, buf + buf_size));
 });
-var seekfunc = Runtime.addFunction((opaque:number, offset:number, whence:SeekType) => {
+var seekfunc = Runtime.addFunction(function(opaque:number, offsetLow:number, offsetHight:number, whence:SeekType) {
 	//console.log('seekfunc', opaque, offset, whence);
-	return CustomStream.items[opaque]._seek(offset, whence);
+	return CustomStream.items[opaque]._seek(offsetLow + offsetHight * Math.pow(2, 32), whence);
 });
 
 export class MemoryCustomStream extends CustomStream {
@@ -203,7 +213,9 @@ export class MemoryCustomStream extends CustomStream {
 	public read(buf:Uint8Array):number {
 		//console.log('read', buf.length);
 		var readlen = Math.min(buf.length, this.available);
-		buf.subarray(0, readlen).set(this.data.subarray(this.position, this.position + readlen));
+		if (readlen > 0) {
+			buf.subarray(0, readlen).set(this.data.subarray(this.position, this.position + readlen));
+		}
 		return readlen;
 	}
 	public write(buf:Uint8Array):number {
@@ -214,7 +226,7 @@ export class MemoryCustomStream extends CustomStream {
 }
 
 export class MeStream {
-	constructor(public state:ME_DecodeState, public onclose?:(stream:MeStream) => void) {
+	constructor(public customStream:CustomStream, public state:ME_DecodeState, public onclose?:(stream:MeStream) => void) {
 	}
 	close() {
 		if (this.onclose) this.onclose(this);
@@ -225,11 +237,16 @@ export class MeStream {
 		if ((<any>v) == 0) return null;
 		return new MePacket(this, v);
 	}
+	seek(timestamp:number) {
+		_me_seek(this.state, timestamp);
+	}
+	get position() { return this.customStream.position; }
+	get length() { return this.customStream.length; }
 	static open(customStream:CustomStream):MeStream {
 		var nameStr = new MeString(customStream.name);
 		try {
 			var csid = CustomStream.alloc(customStream);
-			return new MeStream(
+			return new MeStream(customStream,
 				_me_open(nameStr.ptr, csid, readfunc, writefunc, seekfunc), () => {
 					customStream.close();
 					CustomStream.free(csid);

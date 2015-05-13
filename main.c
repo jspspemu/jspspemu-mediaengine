@@ -16,6 +16,11 @@ typedef struct {
 } ME_DecodeState;
 
 typedef struct {
+	AVPacket packet;
+} ME_Packet;
+
+typedef struct {
+	//int64_t posInStream;
 	int size;
 	union {
 		void *data;
@@ -92,10 +97,14 @@ void me_close(ME_DecodeState *state) {
 	av_free(state);
 }
 
-AVPacket *me_packet_read(ME_DecodeState *state) {
-	AVPacket *packet = av_malloc(sizeof(AVPacket));
-	memset(packet, 0, sizeof(AVPacket));
-	if (av_read_frame(state->format, packet) < 0) {
+void me_seek(ME_DecodeState *state, int64_t timestamp) {
+	av_seek_frame(state->format, -1, timestamp, AVSEEK_FLAG_BACKWARD);
+}
+
+ME_Packet *me_packet_read(ME_DecodeState *state) {
+	ME_Packet *packet = av_malloc(sizeof(ME_Packet));
+	memset(packet, 0, sizeof(ME_Packet));
+	if (av_read_frame(state->format, &packet->packet) < 0) {
 		av_free(packet);
 		return NULL;
 	} else {
@@ -103,12 +112,28 @@ AVPacket *me_packet_read(ME_DecodeState *state) {
 	}
 }
 
-void me_packet_free(AVPacket *packet) {
+int64_t me_packet_get_pts(ME_Packet *packet) {
+	return packet->packet.pts;
+}
+
+int64_t me_packet_get_dts(ME_Packet *packet) {
+	return packet->packet.dts;
+}
+
+int64_t me_packet_get_pos(ME_Packet *packet) {
+	return packet->packet.pos;
+}
+
+int64_t me_packet_get_duration(ME_Packet *packet) {
+	return packet->packet.duration;
+}
+
+void me_packet_free(ME_Packet *packet) {
 	av_free(packet);
 }
 
-enum AVMediaType me_packet_get_type(ME_DecodeState *state, AVPacket *packet) {
-	return state->format->streams[packet->stream_index]->codec->codec_type;
+enum AVMediaType me_packet_get_type(ME_DecodeState *state, ME_Packet *packet) {
+	return state->format->streams[packet->packet.stream_index]->codec->codec_type;
 }
 
 int me_buffer_get_size(ME_BufferData *ad) { return ad->size; }
@@ -134,7 +159,7 @@ void me_buffer_free(ME_BufferData *ad) {
 
 int min(int a, int b) { return (a < b) ? a : b; }
 
-ME_BufferData *me_packet_decode_audio(ME_DecodeState *state, AVPacket *packet, int channels, int orate) {
+ME_BufferData *me_packet_decode_audio(ME_DecodeState *state, ME_Packet *packet, int channels, int orate) {
 	AVFrame *frame = av_frame_alloc();
 	ME_BufferData *buffer;
 	int gotFrame = 0;
@@ -145,21 +170,21 @@ ME_BufferData *me_packet_decode_audio(ME_DecodeState *state, AVPacket *packet, i
 	void* ichannels[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 	int consumed = 0;
 	
-	if (packet->size <= 0) return NULL;
+	if (packet->packet.size <= 0) return NULL;
 	
-	consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, packet);
+	consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, &packet->packet);
 	
 	//if (gotFrame == 0 || consumed <= 0 && (packet->pos + consumed) >= packet->size) {
 	if (gotFrame == 0 || consumed <= 0) {
-		packet->data = NULL;
-		packet->size = 0;
+		packet->packet.data = NULL;
+		packet->packet.size = 0;
 		//consumed = avcodec_decode_audio4(state->stream_audio->codec, frame, &gotFrame, packet);
 
 		av_frame_free(&frame);
 		return NULL;
 	} else {
-		packet->size -= consumed;
-		packet->data += consumed;
+		packet->packet.size -= consumed;
+		packet->packet.data += consumed;
 
 		irate = frame->sample_rate;
 		if (orate <= 0) orate = irate;
